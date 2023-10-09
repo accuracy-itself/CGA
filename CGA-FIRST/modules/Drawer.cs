@@ -177,7 +177,6 @@ namespace CGA_FIRST.modules
             return bmp;
         }
 
-        
         public void ZoomIn()
         {
             eye.Z -= zoom_number;
@@ -206,18 +205,7 @@ namespace CGA_FIRST.modules
         public Bitmap SetUpCamera()
         {
             SetWorldToViewMatrix();
-            Vector4 temp;
-
             vertexes_changeable = new List<Vector4>();
-
-            changeVertexes();
-
-            Bitmap bmp = new Bitmap(window_width, window_height);
-            Graphics gfx = Graphics.FromImage(bmp);
-            SolidBrush brush = new SolidBrush(backgroundColour);
-
-            gfx.FillRectangle(brush, 0, 0, window_width, window_height);
-            //add locks (with bitmap через УКАЗАТЕЛИ с unsafe кодом, fast works with bitmaps in C#)
             return Draw();
         }
     }
