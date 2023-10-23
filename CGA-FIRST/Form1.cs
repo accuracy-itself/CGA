@@ -21,8 +21,8 @@ namespace CGA_FIRST
             objectPB.MouseWheel += new MouseEventHandler(objectPB_MouseWheel);
 
             objParser = new ObjParser();
-            objParser.parseFile("images/tulips.obj");
-            //objParser.parseFile("images/cube.obj");
+            objParser.parseFile("images/cube.obj");
+            //objParser.parseFile("images/dog.obj");
 
             drawer = new Drawer(objectPB.Width, objectPB.Height, objParser.vertexes, objParser.faces);
 
@@ -67,7 +67,7 @@ namespace CGA_FIRST
 
         private void Form1_KeyDown(object sender, KeyEventArgs e)
         {
-            int coef = 20;
+            int coef = 5;
             switch (e.KeyCode)
             {
                 case Keys.W:

@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace CGA_FIRST.modules
 {
@@ -21,7 +23,7 @@ namespace CGA_FIRST.modules
             foreach (string line in lines)
             {
 
-                string[] literals = line.Trim().Split(' ');
+                string[] literals = Regex.Split(line, @"\s+");
                 switch (literals[0])
                 {
                     case "v":
