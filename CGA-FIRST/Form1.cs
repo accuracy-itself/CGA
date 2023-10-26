@@ -21,8 +21,10 @@ namespace CGA_FIRST
             objectPB.MouseWheel += new MouseEventHandler(objectPB_MouseWheel);
 
             objParser = new ObjParser();
-            objParser.parseFile("images/cube.obj");
+            //objParser.parseFile("images/cube.obj");
             //objParser.parseFile("images/dog.obj");
+            //objParser.parseFile("images/mancubus.obj");
+            objParser.parseFile("images/doomslayer.obj");
 
             drawer = new Drawer(objectPB.Width, objectPB.Height, objParser.vertexes, objParser.faces);
 

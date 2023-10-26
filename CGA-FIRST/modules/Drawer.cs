@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Linq;
 using System.Numerics;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -18,7 +19,7 @@ namespace CGA_FIRST.modules
         private int window_width;
         private int window_height;
         private const int scale = 1;
-        private const int zoom_number = 15;
+        private const int zoom_number = 40;
         private float zFar = 1000000, zNear = 0.1F;
         private Color lineColour = Color.Blue;
         private Color lightColor = Color.Blue;
@@ -112,10 +113,10 @@ namespace CGA_FIRST.modules
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(scaleMatrix);
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(scaleMatrix);
 
+                vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(translationMatrix);
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixX);
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixY);
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixZ);
-                vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(translationMatrix);
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(worldToViewMatrix);
                 vertexes_view.Add(vertexes_changeable[i]);
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(viewToProjectionMatrix);
@@ -195,6 +196,63 @@ namespace CGA_FIRST.modules
 
         public unsafe void FillTriangle(List<List<int>> face, BitmapData bData, int bitsPerPixel, Bitmap bmp, byte* scan0, Color color)
         {
+            Vector4 a = vertexes_changeable[face[0][0] - 1];
+            Vector4 b = vertexes_changeable[face[1][0] - 1];
+            Vector4 c = vertexes_changeable[face[2][0] - 1];
+             
+            if (a.Y > c.Y) {
+                (a, c) = (c, a);   
+            }
+
+            if (a.Y > b.Y)
+            {
+                (a, b) = (b, a);
+            }
+
+            if (b.Y > c.Y)
+            {
+                (b, c) = (c, b);
+            }
+
+            Vector4 k1 = (c - a) / (c.Y - a.Y);
+            Vector4 k2 = (b - a) / (b.Y - a.Y);
+            Vector4 k3 = (c - b) / (c.Y - b.Y);
+
+            int top = Math.Max(0, (int)Math.Ceiling(a.Y));
+            int bottom = Math.Min(window_height, (int)Math.Ceiling(c.Y));
+
+            for (int y = top; y < bottom; y++) {
+                Vector4 l = a + (y - a.Y) * k1;
+                Vector4 r = (y < b.Y) ? a + (y - a.Y) * k2 : b + (y - b.Y) * k3;
+
+                if (l.X > r.X) {
+                    (l, r) = (r, l);
+                }
+
+                Vector4 k = (r - l) / (r.X - l.X);
+                
+                int left = Math.Max(0, (int) Math.Ceiling(l.X));
+                int right = Math.Min(window_width, (int)Math.Ceiling(r.X));
+
+                for (int x = left; x < right; x++) {
+                    Vector4 p = l + (x - l.X) * k;
+                    
+                    int index = (int)y * window_width + (int)x;
+                    if (p.Z < zBuffer[index])
+                    {
+                        zBuffer[index] = p.Z;
+                        byte* data = scan0 + (int)y * bData.Stride + (int)x * bitsPerPixel / 8;
+
+                        data[0] = color.B;
+                        data[1] = color.G;
+                        data[2] = color.R;
+                    }
+
+                }
+            }
+
+            /*
+
             int x1 = (int)vertexes_changeable[face[0][0] - 1].X;
             int y1 = (int)vertexes_changeable[face[0][0] - 1].Y;
             int z1 = (int)vertexes_changeable[face[0][0] - 1].Z;
@@ -231,6 +289,7 @@ namespace CGA_FIRST.modules
 
                 DrawLine((int)x11, (int)x12, (int)y11, (int)y12, (int)z11, (int)z12, bData, bitsPerPixel, bmp, scan0, color);
             }
+            */
 
         }
 
@@ -245,12 +304,18 @@ namespace CGA_FIRST.modules
             float z = z1;
             if ((x < window_width) && (x > 0) && (y < window_height) && (y > 0))
             {
-                byte* data = scan0 + (int)y * bData.Stride + (int)x * bitsPerPixel / 8;
+                int index = (int)y * window_width + (int)x;
+                if (z > zBuffer[index])
+                {
+                    zBuffer[index] = z;
+                    byte* data = scan0 + (int)y * bData.Stride + (int)x * bitsPerPixel / 8;
 
-                data[0] = color.B;
-                data[1] = color.G;
-                data[2] = color.R;
+                    data[0] = color.B;
+                    data[1] = color.G;
+                    data[2] = color.R;
+                }
             }
+
             for (int k = 0; k < steps; k++)
             {
                 x += dx;
@@ -260,7 +325,7 @@ namespace CGA_FIRST.modules
                 if ((x < bmp.Width) && (x > 0) && (y < bmp.Height) && (y > 0))
                 {
                     int index = (int)y * window_width + (int)x;
-                    if (z < zBuffer[index])
+                    if (z > zBuffer[index])
                     {
                         zBuffer[index] = z;
                         byte* data = scan0 + (int)y * bData.Stride + (int)x * bitsPerPixel / 8;
@@ -309,7 +374,7 @@ namespace CGA_FIRST.modules
         {
             Vector3 viewVector = ToVector3(vertexes_view[face[0][0] - 1]) - eye;
 
-            return Vector3.Dot(CalculateNormal(face), viewVector) < 0;
+            return Vector3.Dot(CalculateNormal(face), viewVector) <= 0;
         }
         
         private Vector3 ToVector3(Vector4 vector)
