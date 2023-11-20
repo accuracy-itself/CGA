@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Text.RegularExpressions;
 
 namespace CGA_FIRST.modules
@@ -11,6 +12,7 @@ namespace CGA_FIRST.modules
     {
         public List<double[]> vertexes = new List<double[]>();
         public List<double[]> textures = new List<double[]>();
+        public List<Vector3> normals = new List<Vector3>();
         public List<List<List<int>>> faces = new List<List<List<int>>>();        
 
         public void parseFile(string path)
@@ -69,6 +71,13 @@ namespace CGA_FIRST.modules
                                 topLevelList.Add(tempList);
                             }
                             faces.Add(topLevelList);
+                        }
+                        break;
+                    case "vn":
+                        {
+                            normals.Add(new Vector3 ((float)double.Parse(literals[1], fmt), 
+                                                     (float)double.Parse(literals[2], fmt),
+                                                     (float)double.Parse(literals[3], fmt)));
                         }
                         break;
                 }

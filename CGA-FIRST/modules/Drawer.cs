@@ -2,14 +2,9 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.Linq;
 using System.Numerics;
-using System.Reflection;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Xml.Linq;
+
 
 namespace CGA_FIRST.modules
 {
@@ -22,22 +17,33 @@ namespace CGA_FIRST.modules
         private const int zoom_number = 40;
         private float zFar = 1000000, zNear = 0.1F;
         private Color lineColour = Color.Blue;
-        private Color lightColor = Color.Blue;
+        private Color lightColor = Color.White;
         private Color backgroundColour = Color.White;
 
         private Vector3 eye = new Vector3(0, 0, 10);
         private Vector3 up = new Vector3(0, 1, 0);
         private Vector3 target = new Vector3(0, 0, 0);
-        private Vector3 lightDirection = new Vector3(1, 0, -1);
+
+        private Vector3 lightDirection = new Vector3(-1, -1, 1);
+        //public static Vector3 light = new Vector3(0f, 0f, 1f);
+        private float lightIntensity = 5000f;
+        private float ambientLightIntensity = 1/5f;
+        private float diffuseLightIntensity = 2f;
+        private float specularFactor = 1f;
+        private float glossFactor = 1024f;
+
         private List<Vector4> vertexes_changeable;
         private List<Vector4> vertexes_start;
         private List<Vector4> vertexes_view;
+        private List<Vector4> vertexes_world;
         private List<double[]> vertexes;
         private List<List<List<int>>> faces;
+        private List<Vector3> normals;
+        private List<Vector3> normals_changeable;
 
         private Matrix4x4 worldToViewMatrix;
         private Matrix4x4 viewToProjectionMatrix;
-        private Matrix4x4 projectionToViewMatrix;
+        private Matrix4x4 projectionToScreenMatrix;
         private Matrix4x4 translationMatrix = new Matrix4x4(
                 1, 0, 0, 0,
                 0, 1, 0, 0,
@@ -54,13 +60,15 @@ namespace CGA_FIRST.modules
 
         private float[] zBuffer;
 
-        public Drawer(int width, int height, List<double[]> vertexes, List<List<List<int>>> faces)
+        public Drawer(int width, int height, List<double[]> vertexes, List<List<List<int>>> faces, List<Vector3> normals)
         {
+            lightDirection = Vector3.Normalize(lightDirection);
             window_width = width;
             window_height = height;
             //zNear = window_width / 2;
             this.faces = faces;
             this.vertexes = vertexes;
+            this.normals = normals;
             float aspect = (float)window_width / window_height;
             viewToProjectionMatrix = new Matrix4x4(
                     (float)(1 / (aspect * Math.Tan(Math.PI/8))), 0, 0, 0,
@@ -69,7 +77,7 @@ namespace CGA_FIRST.modules
                     0, 0, -1, 0
                 );
 
-            projectionToViewMatrix = new Matrix4x4(
+            projectionToScreenMatrix = new Matrix4x4(
                     (float)(window_width / 2), 0, 0, (float)(window_width / 2),
                     0, -(float)(window_height / 2), 0, (float)(window_height / 2),
                     0, 0, 1, 0,
@@ -82,6 +90,8 @@ namespace CGA_FIRST.modules
             Vector4 temp;
             vertexes_start = new List<Vector4>();
             vertexes_view = new List<Vector4>();
+            vertexes_world = new List<Vector4>();
+            normals_changeable = new List<Vector3>();
             foreach (double[] vertex in vertexes)
             {
                 if (vertex.Length == 3)
@@ -105,10 +115,13 @@ namespace CGA_FIRST.modules
         public void changeVertexes() {
             vertexes_changeable.Clear();
             vertexes_view.Clear();
-            
+            vertexes_world.Clear();
+            normals_changeable.Clear();
 
             for (int i = 0; i < vertexes_start.Count; i++)
             {
+                //from model
+                //to world
                 vertexes_changeable.Add(vertexes_start[i]);
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(scaleMatrix);
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(scaleMatrix);
@@ -117,11 +130,27 @@ namespace CGA_FIRST.modules
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixX);
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixY);
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixZ);
+                vertexes_world.Add(vertexes_changeable[i]);
+                
+                //to observer
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(worldToViewMatrix);
                 vertexes_view.Add(vertexes_changeable[i]);
+                
+                //to projection
                 vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(viewToProjectionMatrix);
                 vertexes_changeable[i] = Vector4.Divide(vertexes_changeable[i], vertexes_changeable[i].W);
-                vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(projectionToViewMatrix);
+
+                //to screen
+                vertexes_changeable[i] = vertexes_changeable[i].ApplyMatrix(projectionToScreenMatrix);
+            }
+
+            for (int i = 0; i < normals.Count; i++) {
+                normals_changeable.Add(normals[i]);
+                normals_changeable[i] = normals_changeable[i].ApplyMatrix(translationMatrix);
+                normals_changeable[i] = normals_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixX);
+                normals_changeable[i] = normals_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixY);
+                normals_changeable[i] = normals_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixZ);
+                normals_changeable[i] = normals_changeable[i].ApplyMatrix(worldToViewMatrix);
             }
         }
 
@@ -148,44 +177,15 @@ namespace CGA_FIRST.modules
             byte bitsPerPixel = (byte)System.Drawing.Bitmap.GetPixelFormatSize(bData.PixelFormat);
             byte* scan0 = (byte*)bData.Scan0.ToPointer();
 
-            int x1, x2, y1, y2, z1, z2;
             for (int j = 0; j < faces.Count; j++)
             {
                 List<List<int>> face = faces[j];
                 if (!IsBackFace(face))
                 {
-                    Vector3 normal = CalculateNormal(face);
-                    float lightIntensity = CalculateLightIntensity(normal, lightDirection);
-                    Color color = CalculateColor(lightIntensity, lightColor);
-                    for (int i = 0; i < face.Count; i++)
-                    {
-                        List<int> temp = face[i];
-                        if (temp[0] - 1 < 0)
-                            continue;
-                        x1 = (int)vertexes_changeable[temp[0] - 1].X;
-                        y1 = (int)vertexes_changeable[temp[0] - 1].Y;
-                        z1 = (int)vertexes_changeable[temp[0] - 1].Z;
-                        if (i == face.Count - 1)
-                        {
-                            x2 = (int)vertexes_changeable[face[0][0] - 1].X;
-                            y2 = (int)vertexes_changeable[face[0][0] - 1].Y;
-                            z2 = (int)vertexes_changeable[face[0][0] - 1].Z;
-                        }
-                        else
-                        {
-                            if (face[i + 1][0] - 1 < 0)
-                                continue;
-                            
-                            x2 = (int)vertexes_changeable[face[i + 1][0] - 1].X;
-                            y2 = (int)vertexes_changeable[face[i + 1][0] - 1].Y;
-                            z2 = (int)vertexes_changeable[face[i + 1][0] - 1].Z;
-                            
-                        }
+                    //Vector3 normal = CalculateNormal(face);
+                    //float lightIntensity = CalculateLightIntensity(normal, lightDirection);
 
-                        DrawLine(x1, x2, y1, y2, z1, z2, bData, bitsPerPixel, bmp, scan0, color);
-                    }
-
-                    FillTriangle(face, bData, bitsPerPixel, bmp, scan0, color);
+                    FillTriangle(face, bData, bitsPerPixel, bmp, scan0);
                 }
             }
 
@@ -194,29 +194,61 @@ namespace CGA_FIRST.modules
             return bmp;
         }
 
-        public unsafe void FillTriangle(List<List<int>> face, BitmapData bData, int bitsPerPixel, Bitmap bmp, byte* scan0, Color color)
+        public unsafe void FillTriangle(List<List<int>> face, BitmapData bData, int bitsPerPixel, Bitmap bmp, byte* scan0)
         {
+            Vector3[] worldTriangle = { MatrixSolver.createFromVector4(vertexes_world[face[0][0] - 1]), 
+                                        MatrixSolver.createFromVector4(vertexes_world[face[1][0] - 1]), 
+                                        MatrixSolver.createFromVector4(vertexes_world[face[2][0] - 1])};
+
+            //screen
             Vector4 a = vertexes_changeable[face[0][0] - 1];
             Vector4 b = vertexes_changeable[face[1][0] - 1];
             Vector4 c = vertexes_changeable[face[2][0] - 1];
-             
+
+            /*
+            Vector3 vertexNormal0 = Vector3.Normalize(normals[face[0][2] - 1]);
+            Vector3 vertexNormal1 = Vector3.Normalize(normals[face[1][2] - 1]);
+            Vector3 vertexNormal2 = Vector3.Normalize(normals[face[2][2] - 1]);
+            */
+            Vector3 vertexNormal0 = Vector3.Normalize(normals_changeable[face[0][2] - 1]);
+            Vector3 vertexNormal1 = Vector3.Normalize(normals_changeable[face[1][2] - 1]);
+            Vector3 vertexNormal2 = Vector3.Normalize(normals_changeable[face[2][2] - 1]);
+
+
             if (a.Y > c.Y) {
-                (a, c) = (c, a);   
+                (a, c) = (c, a);
+                (vertexNormal0, vertexNormal2) = (vertexNormal2, vertexNormal0);
+                (worldTriangle[0], worldTriangle[2]) = (worldTriangle[2], worldTriangle[0]);
             }
 
             if (a.Y > b.Y)
             {
                 (a, b) = (b, a);
+                (vertexNormal0, vertexNormal1) = (vertexNormal1, vertexNormal0);
+                (worldTriangle[0], worldTriangle[1]) = (worldTriangle[1], worldTriangle[0]);
             }
 
             if (b.Y > c.Y)
             {
                 (b, c) = (c, b);
+                (vertexNormal1, vertexNormal2) = (vertexNormal2, vertexNormal1);
+                (worldTriangle[1], worldTriangle[2]) = (worldTriangle[2], worldTriangle[1]);
             }
 
             Vector4 k1 = (c - a) / (c.Y - a.Y);
+            Vector4 screenKoeff02 = (c - a) / (c.Y - a.Y);
+            Vector3 vertexNormalKoeff02 = (vertexNormal2 - vertexNormal0) / (c.Y - a.Y);
+            Vector3 worldKoeff02 = (worldTriangle[2] - worldTriangle[0]) / (c.Y - a.Y);
+
             Vector4 k2 = (b - a) / (b.Y - a.Y);
+            Vector4 screenKoeff01 = (b - a) / (b.Y - a.Y);
+            Vector3 vertexNormalKoeff01 = (vertexNormal1 - vertexNormal0) / (b.Y - a.Y);
+            Vector3 worldKoeff01 = (worldTriangle[1] - worldTriangle[0]) / (b.Y - a.Y);
+
             Vector4 k3 = (c - b) / (c.Y - b.Y);
+            Vector4 screenKoeff03 = (c - b) / (c.Y - b.Y);
+            Vector3 vertexNormalKoeff03 = (vertexNormal2 - vertexNormal1) / (c.Y - b.Y);
+            Vector3 worldKoeff03 = (worldTriangle[2] - worldTriangle[1]) / (c.Y - b.Y);
 
             int top = Math.Max(0, (int)Math.Ceiling(a.Y));
             int bottom = Math.Min(window_height, (int)Math.Ceiling(c.Y));
@@ -225,115 +257,89 @@ namespace CGA_FIRST.modules
                 Vector4 l = a + (y - a.Y) * k1;
                 Vector4 r = (y < b.Y) ? a + (y - a.Y) * k2 : b + (y - b.Y) * k3;
 
+                Vector3 worldL = y < b.Y ? worldTriangle[0] + (y - a.Y) * worldKoeff01 :
+                                           worldTriangle[1] + (y - b.Y) * worldKoeff03;
+                Vector3 worldR = worldTriangle[0] + (y - a.Y) * worldKoeff02;
+
+
+                // Нахождение нормали для левого и правого Y.
+                Vector3 normalL = y < b.Y ? vertexNormal0 + (y - a.Y) * vertexNormalKoeff01 :
+                                                            vertexNormal1 + (y - b.Y) * vertexNormalKoeff03;
+                Vector3 normalR = vertexNormal0 + (y - a.Y) * vertexNormalKoeff02;
+
                 if (l.X > r.X) {
                     (l, r) = (r, l);
+                    (normalL, normalR) = (normalR, normalL);
+                    (worldL, worldR) = (worldR, worldL);
                 }
 
                 Vector4 k = (r - l) / (r.X - l.X);
-                
+                Vector3 normalKoeff = (normalR - normalL) / (r.X - l.X);
+                Vector3 worldKoeff = (worldR - worldL) / (r.X - l.X);
+
                 int left = Math.Max(0, (int) Math.Ceiling(l.X));
                 int right = Math.Min(window_width, (int)Math.Ceiling(r.X));
 
+
                 for (int x = left; x < right; x++) {
                     Vector4 p = l + (x - l.X) * k;
-                    
+                    Vector3 pWorld = worldL + (x - l.X) * worldKoeff;
+
                     int index = (int)y * window_width + (int)x;
                     if (p.Z < zBuffer[index])
                     {
+                        // Нахождение обратного вектора направления света.
+                        //Vector3 light = Vector3.Normalize( lightDirection - pWorld);
+
+                        Vector3 normal = normalL + (x - l.X) * normalKoeff;
+                        normal = Vector3.Normalize(normal);
+
+                        // Нахождение дистанции до источника света.
+                        //float distance = (lightDirection - pWorld).LengthSquared();
+
+                        // Затенение объекта в зависимости от дистанции света до модели.
+                        //float attenuation = 1 / Math.Max(distance, 0.01f);
+
+                        // Получение затененности каждой точки.
+                        //float intensity = Math.Max(Vector3.Dot(normal, lightDirection), 0);
+                        //float intensity = Math.Max(CalculateLightIntensity(normal, lightDirection), 0);
+
+                        float[] ambientValues = AmbientLightning();
+
+                        float[] diffuseValues = DiffuseLightning(normal, lightDirection);
+
+                        //float[] specularValues = SpecularLightning(Vector3.Normalize(eye - pWorld), lightDirection, normal);
+
+                        //var irradiance = lightIntensity * intensity * attenuation;
+
+
                         zBuffer[index] = p.Z;
                         byte* data = scan0 + (int)y * bData.Stride + (int)x * bitsPerPixel / 8;
 
-                        data[0] = color.B;
-                        data[1] = color.G;
-                        data[2] = color.R;
+                        //float koefPow = 0.0000001f;
+                        //float koefPow = 1f;
+
+                        byte B = (byte)(Math.Min(lineColour.B * (ambientValues[2]), 255));
+                        byte G = (byte)(lineColour.G * (ambientValues[1]));
+                        byte R = (byte)(lineColour.R * (ambientValues[0]));
+
+                        data[0] = (byte) Math.Min(lineColour.B * (ambientValues[2] + diffuseValues[2]), 255);
+                        data[1] = (byte) Math.Min(lineColour.G * (ambientValues[1] + diffuseValues[1]), 255);
+                        data[2] = (byte) Math.Min(lineColour.R * (ambientValues[0] + diffuseValues[0]), 255);
+
+                        /*
+                        data[0] = (byte)Math.Min(
+                            Math.Pow((ambientValues[2] + (diffuseValues[2] + specularValues[2]) * irradiance * lightColor.B), koefPow) * 255, 
+                            255);
+                        data[1] = (byte)Math.Min(
+                            Math.Pow((ambientValues[1] + (diffuseValues[1] + specularValues[1]) * irradiance * lightColor.G), koefPow) * 255,
+                            255); ;
+                        data[2] = (byte)Math.Min(
+                            Math.Pow((ambientValues[0] + (diffuseValues[0] + specularValues[0]) * irradiance * lightColor.R), koefPow) * 255,
+                            255); */
+                        int aasd = 6;
                     }
 
-                }
-            }
-
-            /*
-
-            int x1 = (int)vertexes_changeable[face[0][0] - 1].X;
-            int y1 = (int)vertexes_changeable[face[0][0] - 1].Y;
-            int z1 = (int)vertexes_changeable[face[0][0] - 1].Z;
-            int x2 = (int)vertexes_changeable[face[1][0] - 1].X;
-            int y2 = (int)vertexes_changeable[face[1][0] - 1].Y;
-            int z2 = (int)vertexes_changeable[face[1][0] - 1].Z;
-            int x3 = (int)vertexes_changeable[face[2][0] - 1].X;
-            int y3 = (int)vertexes_changeable[face[2][0] - 1].Y;
-            int z3 = (int)vertexes_changeable[face[2][0] - 1].Z;
-
-            int steps = Math.Max(Math.Max(Math.Abs(x3 - x1), Math.Abs(y3 - y1)),
-                                 Math.Max(Math.Abs(x3 - x2), Math.Abs(y3 - y2)));
-            float dx1 = (float)(x3 - x1) / steps;
-            float dx2 = (float)(x3 - x2) / steps;
-            float dy1 = (float)(y3 - y1) / steps;
-            float dy2 = (float)(y3 - y2) / steps;
-            float dz1 = (float)(z3 - z1) / steps;
-            float dz2 = (float)(z3 - z2) / steps;
-
-            float x11 = x1;
-            float y11 = y1;
-            float z11 = z1;
-            float x12 = x2;
-            float y12 = y2;
-            float z12 = z2;
-            for (int i = 0; i < steps; i++)
-            {
-                x11 += dx1;
-                y11 += dy1;
-                z11 += dz1;
-                x12 += dx2;
-                y12 += dy2;
-                z12 += dz2;
-
-                DrawLine((int)x11, (int)x12, (int)y11, (int)y12, (int)z11, (int)z12, bData, bitsPerPixel, bmp, scan0, color);
-            }
-            */
-
-        }
-
-        private unsafe void  DrawLine(int x1, int x2, int y1, int y2, int z1, int z2, BitmapData bData, int bitsPerPixel, Bitmap bmp, byte* scan0, Color color) {
-            int steps = Math.Max(Math.Abs(x2 - x1), Math.Abs(y2 - y1));
-            float dx = (float)(x2 - x1) / steps;
-            float dy = (float)(y2 - y1) / steps;
-            float dz = (float)(z2 - z1) / steps;
-
-            float x = x1;
-            float y = y1;
-            float z = z1;
-            if ((x < window_width) && (x > 0) && (y < window_height) && (y > 0))
-            {
-                int index = (int)y * window_width + (int)x;
-                if (z > zBuffer[index])
-                {
-                    zBuffer[index] = z;
-                    byte* data = scan0 + (int)y * bData.Stride + (int)x * bitsPerPixel / 8;
-
-                    data[0] = color.B;
-                    data[1] = color.G;
-                    data[2] = color.R;
-                }
-            }
-
-            for (int k = 0; k < steps; k++)
-            {
-                x += dx;
-                y += dy;
-                z += dz;
-
-                if ((x < bmp.Width) && (x > 0) && (y < bmp.Height) && (y > 0))
-                {
-                    int index = (int)y * window_width + (int)x;
-                    if (z > zBuffer[index])
-                    {
-                        zBuffer[index] = z;
-                        byte* data = scan0 + (int)y * bData.Stride + (int)x * bitsPerPixel / 8;
-
-                        data[0] = color.B;
-                        data[1] = color.G;
-                        data[2] = color.R;
-                    }
                 }
             }
         }
@@ -396,12 +402,54 @@ namespace CGA_FIRST.modules
             return Math.Max(scalar, 0);
         }
 
-        private Color CalculateColor(float lightIntensity, Color lightColor)
+        private float[] AmbientLightning()
         {
-            return Color.FromArgb(
-                (int)(lightIntensity * lightColor.R),
-                (int)(lightIntensity * lightColor.G),
-                (int)(lightIntensity * lightColor.B));
+            float[] values = new float[3];
+
+            values[0] = (float)(lightColor.R / 255 * ambientLightIntensity);
+            values[1] = (float)(lightColor.G / 255 * ambientLightIntensity);
+            values[2] = (float)(lightColor.B / 255 * ambientLightIntensity);
+
+            return values;
+
+        }
+
+        /*private float[] DiffuseLightning(Vector3 normal, Vector3 lightDirection)
+        {
+            float[] values = new float[3];
+
+            float scalar = Math.Max(CalculateLightIntensity(normal, lightDirection), 0);
+
+            values[0] = ( lineColour.R);
+            values[1] = (lineColour.G);
+            values[2] = (lineColour.B);
+
+            return values;
+        }*/
+
+        private float[] DiffuseLightning(Vector3 normal, Vector3 lightDirection)
+        {
+            float[] values = new float[3];
+            float scalar = Math.Max(CalculateLightIntensity(normal, lightDirection), 0) * diffuseLightIntensity;
+            values[0] = (float)(lightColor.R / 255 * scalar);
+            values[1] = (float)(lightColor.G / 255 * scalar);
+            values[2] = (float)(lightColor.B / 255 * scalar);
+            return values;
+        }
+
+        private float[] SpecularLightning(Vector3 View, Vector3 lightDirection, Vector3 normal)
+        {
+            Vector3 reflection = Vector3.Normalize(Vector3.Reflect(-lightDirection, normal));
+            float RV = Math.Max(Vector3.Dot(reflection, View), 0);
+
+            float[] values = new float[3];
+            float temp = (float)Math.Pow(RV, glossFactor);
+
+            values[0] = (specularFactor * temp);
+            values[1] = (specularFactor * temp);
+            values[2] = (specularFactor * temp);
+
+            return values;
         }
     }
 }
