@@ -16,7 +16,8 @@ namespace CGA_FIRST.modules
         private const int scale = 1;
         private const int zoom_number = 40;
         private float zFar = 1000000, zNear = 0.1F;
-        private Color lineColour = Color.Blue;
+        //private Color lineColour = Color.Blue;
+        private Color lineColour = Color.FromArgb(255, 255, 100, 100);
         private Color lightColor = Color.White;
         private Color backgroundColour = Color.White;
 
@@ -29,8 +30,8 @@ namespace CGA_FIRST.modules
         private float lightIntensity = 5000f;
         private float ambientLightIntensity = 1/5f;
         private float diffuseLightIntensity = 2f;
-        private float specularFactor = 1f;
-        private float glossFactor = 1024f;
+        private float specularFactor = 10f;
+        private float glossFactor = 24f;
 
         private List<Vector4> vertexes_changeable;
         private List<Vector4> vertexes_start;
@@ -308,38 +309,21 @@ namespace CGA_FIRST.modules
 
                         float[] diffuseValues = DiffuseLightning(normal, lightDirection);
 
-                        //float[] specularValues = SpecularLightning(Vector3.Normalize(eye - pWorld), lightDirection, normal);
-
-                        //var irradiance = lightIntensity * intensity * attenuation;
+                        float[] specularValues = SpecularLightning(Vector3.Normalize(eye - pWorld), lightDirection, normal);
 
 
                         zBuffer[index] = p.Z;
                         byte* data = scan0 + (int)y * bData.Stride + (int)x * bitsPerPixel / 8;
 
-                        //float koefPow = 0.0000001f;
-                        //float koefPow = 1f;
-
                         byte B = (byte)(Math.Min(lineColour.B * (ambientValues[2]), 255));
                         byte G = (byte)(lineColour.G * (ambientValues[1]));
                         byte R = (byte)(lineColour.R * (ambientValues[0]));
 
-                        data[0] = (byte) Math.Min(lineColour.B * (ambientValues[2] + diffuseValues[2]), 255);
-                        data[1] = (byte) Math.Min(lineColour.G * (ambientValues[1] + diffuseValues[1]), 255);
-                        data[2] = (byte) Math.Min(lineColour.R * (ambientValues[0] + diffuseValues[0]), 255);
+                        data[0] = (byte) Math.Min(lineColour.B * (ambientValues[2] + diffuseValues[2] + specularValues[2]), 255);
+                        data[1] = (byte) Math.Min(lineColour.G * (ambientValues[1] + diffuseValues[1] + specularValues[1]), 255);
+                        data[2] = (byte) Math.Min(lineColour.R * (ambientValues[0] + diffuseValues[0] + specularValues[0]), 255);
 
-                        /*
-                        data[0] = (byte)Math.Min(
-                            Math.Pow((ambientValues[2] + (diffuseValues[2] + specularValues[2]) * irradiance * lightColor.B), koefPow) * 255, 
-                            255);
-                        data[1] = (byte)Math.Min(
-                            Math.Pow((ambientValues[1] + (diffuseValues[1] + specularValues[1]) * irradiance * lightColor.G), koefPow) * 255,
-                            255); ;
-                        data[2] = (byte)Math.Min(
-                            Math.Pow((ambientValues[0] + (diffuseValues[0] + specularValues[0]) * irradiance * lightColor.R), koefPow) * 255,
-                            255); */
-                        int aasd = 6;
                     }
-
                 }
             }
         }
@@ -414,18 +398,6 @@ namespace CGA_FIRST.modules
 
         }
 
-        /*private float[] DiffuseLightning(Vector3 normal, Vector3 lightDirection)
-        {
-            float[] values = new float[3];
-
-            float scalar = Math.Max(CalculateLightIntensity(normal, lightDirection), 0);
-
-            values[0] = ( lineColour.R);
-            values[1] = (lineColour.G);
-            values[2] = (lineColour.B);
-
-            return values;
-        }*/
 
         private float[] DiffuseLightning(Vector3 normal, Vector3 lightDirection)
         {
