@@ -25,13 +25,13 @@ namespace CGA_FIRST.modules
         private Vector3 up = new Vector3(0, 1, 0);
         private Vector3 target = new Vector3(0, 0, 0);
 
-        private Vector3 lightDirection = new Vector3(-1, -1, 1);
+        private Vector3 lightDirection = new Vector3(-1, -1, -1);
         //public static Vector3 light = new Vector3(0f, 0f, 1f);
         private float lightIntensity = 5000f;
         private float ambientLightIntensity = 1/5f;
         private float diffuseLightIntensity = 2f;
         private float specularFactor = 10f;
-        private float glossFactor = 24f;
+        private float glossFactor = 50f;
 
         private List<Vector4> vertexes_changeable;
         private List<Vector4> vertexes_start;
@@ -197,59 +197,52 @@ namespace CGA_FIRST.modules
 
         public unsafe void FillTriangle(List<List<int>> face, BitmapData bData, int bitsPerPixel, Bitmap bmp, byte* scan0)
         {
-            Vector3[] worldTriangle = { MatrixSolver.createFromVector4(vertexes_world[face[0][0] - 1]), 
-                                        MatrixSolver.createFromVector4(vertexes_world[face[1][0] - 1]), 
-                                        MatrixSolver.createFromVector4(vertexes_world[face[2][0] - 1])};
+            //world
+            Vector3 aw = MatrixSolver.createFromVector4(vertexes_world[face[0][0] - 1]);
+            Vector3 bw = MatrixSolver.createFromVector4(vertexes_world[face[1][0] - 1]);
+            Vector3 cw = MatrixSolver.createFromVector4(vertexes_world[face[2][0] - 1]);
 
             //screen
             Vector4 a = vertexes_changeable[face[0][0] - 1];
             Vector4 b = vertexes_changeable[face[1][0] - 1];
             Vector4 c = vertexes_changeable[face[2][0] - 1];
 
-            /*
-            Vector3 vertexNormal0 = Vector3.Normalize(normals[face[0][2] - 1]);
-            Vector3 vertexNormal1 = Vector3.Normalize(normals[face[1][2] - 1]);
-            Vector3 vertexNormal2 = Vector3.Normalize(normals[face[2][2] - 1]);
-            */
-            Vector3 vertexNormal0 = Vector3.Normalize(normals_changeable[face[0][2] - 1]);
-            Vector3 vertexNormal1 = Vector3.Normalize(normals_changeable[face[1][2] - 1]);
-            Vector3 vertexNormal2 = Vector3.Normalize(normals_changeable[face[2][2] - 1]);
+            Vector3 vertexNormalA = Vector3.Normalize(normals_changeable[face[0][2] - 1]);
+            Vector3 vertexNormalB = Vector3.Normalize(normals_changeable[face[1][2] - 1]);
+            Vector3 vertexNormalC = Vector3.Normalize(normals_changeable[face[2][2] - 1]);
 
 
             if (a.Y > c.Y) {
                 (a, c) = (c, a);
-                (vertexNormal0, vertexNormal2) = (vertexNormal2, vertexNormal0);
-                (worldTriangle[0], worldTriangle[2]) = (worldTriangle[2], worldTriangle[0]);
+                (vertexNormalA, vertexNormalC) = (vertexNormalC, vertexNormalA);
+                (aw, cw) = (cw, aw);
             }
 
             if (a.Y > b.Y)
             {
                 (a, b) = (b, a);
-                (vertexNormal0, vertexNormal1) = (vertexNormal1, vertexNormal0);
-                (worldTriangle[0], worldTriangle[1]) = (worldTriangle[1], worldTriangle[0]);
+                (vertexNormalA, vertexNormalB) = (vertexNormalB, vertexNormalA);
+                (aw, bw) = (bw, aw);
             }
 
             if (b.Y > c.Y)
             {
                 (b, c) = (c, b);
-                (vertexNormal1, vertexNormal2) = (vertexNormal2, vertexNormal1);
-                (worldTriangle[1], worldTriangle[2]) = (worldTriangle[2], worldTriangle[1]);
+                (vertexNormalB, vertexNormalC) = (vertexNormalC, vertexNormalB);
+                (bw, cw) = (cw, bw);
             }
 
             Vector4 k1 = (c - a) / (c.Y - a.Y);
-            Vector4 screenKoeff02 = (c - a) / (c.Y - a.Y);
-            Vector3 vertexNormalKoeff02 = (vertexNormal2 - vertexNormal0) / (c.Y - a.Y);
-            Vector3 worldKoeff02 = (worldTriangle[2] - worldTriangle[0]) / (c.Y - a.Y);
+            Vector3 vertexNormalKoeff01 = (vertexNormalC - vertexNormalA) / (c.Y - a.Y);
+            Vector3 worldKoeff01 = (cw - aw) / (c.Y - a.Y);
 
             Vector4 k2 = (b - a) / (b.Y - a.Y);
-            Vector4 screenKoeff01 = (b - a) / (b.Y - a.Y);
-            Vector3 vertexNormalKoeff01 = (vertexNormal1 - vertexNormal0) / (b.Y - a.Y);
-            Vector3 worldKoeff01 = (worldTriangle[1] - worldTriangle[0]) / (b.Y - a.Y);
+            Vector3 vertexNormalKoeff02 = (vertexNormalB - vertexNormalA) / (b.Y - a.Y);
+            Vector3 worldKoeff02 = (bw - aw) / (b.Y - a.Y);
 
             Vector4 k3 = (c - b) / (c.Y - b.Y);
-            Vector4 screenKoeff03 = (c - b) / (c.Y - b.Y);
-            Vector3 vertexNormalKoeff03 = (vertexNormal2 - vertexNormal1) / (c.Y - b.Y);
-            Vector3 worldKoeff03 = (worldTriangle[2] - worldTriangle[1]) / (c.Y - b.Y);
+            Vector3 vertexNormalKoeff03 = (vertexNormalC - vertexNormalB) / (c.Y - b.Y);
+            Vector3 worldKoeff03 = (cw - bw) / (c.Y - b.Y);
 
             int top = Math.Max(0, (int)Math.Ceiling(a.Y));
             int bottom = Math.Min(window_height, (int)Math.Ceiling(c.Y));
@@ -258,15 +251,15 @@ namespace CGA_FIRST.modules
                 Vector4 l = a + (y - a.Y) * k1;
                 Vector4 r = (y < b.Y) ? a + (y - a.Y) * k2 : b + (y - b.Y) * k3;
 
-                Vector3 worldL = y < b.Y ? worldTriangle[0] + (y - a.Y) * worldKoeff01 :
-                                           worldTriangle[1] + (y - b.Y) * worldKoeff03;
-                Vector3 worldR = worldTriangle[0] + (y - a.Y) * worldKoeff02;
+                Vector3 worldL = aw + (y - a.Y) * worldKoeff01;
+                Vector3 worldR = y < b.Y ? aw + (y - a.Y) * worldKoeff02 :
+                                           bw + (y - b.Y) * worldKoeff03;
 
 
                 // Нахождение нормали для левого и правого Y.
-                Vector3 normalL = y < b.Y ? vertexNormal0 + (y - a.Y) * vertexNormalKoeff01 :
-                                                            vertexNormal1 + (y - b.Y) * vertexNormalKoeff03;
-                Vector3 normalR = vertexNormal0 + (y - a.Y) * vertexNormalKoeff02;
+                Vector3 normalL = vertexNormalA + (y - a.Y) * vertexNormalKoeff01;
+                Vector3 normalR = y < b.Y ? vertexNormalA + (y - a.Y) * vertexNormalKoeff02 :
+                                                            vertexNormalB + (y - b.Y) * vertexNormalKoeff03;
 
                 if (l.X > r.X) {
                     (l, r) = (r, l);
@@ -289,28 +282,14 @@ namespace CGA_FIRST.modules
                     int index = (int)y * window_width + (int)x;
                     if (p.Z < zBuffer[index])
                     {
-                        // Нахождение обратного вектора направления света.
-                        //Vector3 light = Vector3.Normalize( lightDirection - pWorld);
-
                         Vector3 normal = normalL + (x - l.X) * normalKoeff;
                         normal = Vector3.Normalize(normal);
 
-                        // Нахождение дистанции до источника света.
-                        //float distance = (lightDirection - pWorld).LengthSquared();
-
-                        // Затенение объекта в зависимости от дистанции света до модели.
-                        //float attenuation = 1 / Math.Max(distance, 0.01f);
-
-                        // Получение затененности каждой точки.
-                        //float intensity = Math.Max(Vector3.Dot(normal, lightDirection), 0);
-                        //float intensity = Math.Max(CalculateLightIntensity(normal, lightDirection), 0);
-
                         float[] ambientValues = AmbientLightning();
 
-                        float[] diffuseValues = DiffuseLightning(normal, lightDirection);
+                        float[] diffuseValues = DiffuseLightning(normal, -lightDirection);
 
-                        float[] specularValues = SpecularLightning(Vector3.Normalize(eye - pWorld), lightDirection, normal);
-
+                        float[] specularValues = SpecularLightning(Vector3.Normalize(eye - pWorld), -lightDirection, normal);
 
                         zBuffer[index] = p.Z;
                         byte* data = scan0 + (int)y * bData.Stride + (int)x * bitsPerPixel / 8;
