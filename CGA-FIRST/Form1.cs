@@ -22,12 +22,19 @@ namespace CGA_FIRST
 
             objParser = new ObjParser();
             //objParser.parseFile("images/cube.obj");
-            objParser.parseFile("images/ball.obj");
+            //objParser.parseFile("images/ball.obj");
             //objParser.parseFile("images/dog.obj");
             //objParser.parseFile("images/mancubus.obj");
             //objParser.parseFile("images/doomslayer.obj");
-
-            drawer = new Drawer(objectPB.Width, objectPB.Height, objParser.vertexes, objParser.faces, objParser.normals);
+            //objParser.parseFile("images/ShovelKnight/Model.obj");
+            //objParser.parseTextures("images/ShovelKnight/textures/diffuse.png", 
+            //                      "images/ShovelKnight/textures/specular.png", 
+            //                    "images/ShovelKnight/textures/normal.png");
+            objParser.parseFile("images/head/Head.obj");
+            objParser.parseTextures("images/head/diffuse.png",
+                                    "images/head/specular.png",
+                                    "images/head/normal.png");
+            drawer = new Drawer(objectPB.Width, objectPB.Height, objParser.verteces, objParser.faces, objParser.normals);
 
             objectPB.Image = drawer.SetUpCamera();
         }
