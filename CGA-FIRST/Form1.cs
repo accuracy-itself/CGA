@@ -30,10 +30,20 @@ namespace CGA_FIRST
             //objParser.parseTextures("images/ShovelKnight/textures/diffuse.png", 
             //                      "images/ShovelKnight/textures/specular.png", 
             //                    "images/ShovelKnight/textures/normal.png");
-            objParser.parseFile("images/head/Head.obj");
+            /*objParser.parseFile("images/head/Head.obj");
             objParser.parseTextures("images/head/diffuse.png",
                                     "images/head/specular.png",
-                                    "images/head/normal.png");
+                                    "images/head/normal.png");*/
+            /*
+                        objParser.parseFile("images/MimicChest/model.obj");
+                        objParser.parseTextures("images/MimicChest/diffuse.jpg",
+                                                "images/MimicChest/specular.jpg",
+                                                "images/MimicChest/normal.png");
+            */
+            objParser.parseFile("images/cube/cube.obj");
+            objParser.parseTextures("images/cube/diffuse.jpg",
+                                    "",
+                                    "");
             drawer = new Drawer(objectPB.Width, objectPB.Height, objParser.verteces, objParser.faces, objParser.normals);
 
             objectPB.Image = drawer.SetUpCamera();

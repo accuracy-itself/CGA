@@ -22,7 +22,7 @@ namespace CGA_FIRST.modules
         private Color lightColor = Color.White;
         private Color backgroundColour = Color.White;
 
-        private Vector3 eye = new Vector3(0, 0, 10);
+        private Vector3 eye = new Vector3(0, 0, 7);
         private Vector3 up = new Vector3(0, 1, 0);
         private Vector3 target = new Vector3(0, 0, 0);
 
@@ -35,7 +35,7 @@ namespace CGA_FIRST.modules
         private float diffuseLightIntensity = 1f;
         //private float specularFactor = 10f;
         private float specularLightIntensity = 1f;
-        private float glossFactor = 40f;
+        private float glossFactor = 16f;
 
         private List<Vector4> verteces_changeable;
         private List<Vector4> verteces_start;
@@ -328,10 +328,11 @@ namespace CGA_FIRST.modules
                         }
 
                         // Нормаль
-                        System.Drawing.Color normalColor = ObjParser.normalMap.GetPixel(
+                        /*System.Drawing.Color normalColor = ObjParser.normalMap.GetPixel(
                                 Convert.ToInt32(texture.X * (ObjParser.normalMap.Width - 1)),
                                 Convert.ToInt32((1 - texture.Y) * (ObjParser.normalMap.Height - 1)));
-                        //normal = new Vector3(normalColor.R, normalColor.G, normalColor.B);
+                        normal = new Vector3(normalColor.R, normalColor.G, normalColor.B);
+                        normal = Vector3.Normalize(normal * 2 - Vector3.One);*/
 
                         float[] ambientValues = AmbientLightning(color);
 
