@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Windows.Forms;
@@ -135,18 +136,29 @@ namespace CGA_FIRST.modules
                 verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixX);
                 verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixY);
                 verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixZ);
+                float W = 1 / verteces_changeable[i].W;
                 verteces_world.Add(verteces_changeable[i]);
-                
+                verteces_world[i] = new Vector4(verteces_changeable[i].X,
+                    verteces_changeable[i].Y,
+                    verteces_changeable[i].Z,
+                    W);
+
                 //to observer
                 verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(worldToViewMatrix);
                 verteces_view.Add(verteces_changeable[i]);
                 
                 //to projection
                 verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(viewToProjectionMatrix);
+                W = 1 / verteces_changeable[i].W;
                 verteces_changeable[i] = Vector4.Divide(verteces_changeable[i], verteces_changeable[i].W);
 
                 //to screen
                 verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(projectionToScreenMatrix);
+                verteces_changeable[i] = new Vector4(verteces_changeable[i].X,
+                    verteces_changeable[i].Y,
+                    verteces_changeable[i].Z,
+                    W);
+                
             }
 
             for (int i = 0; i < normals.Count; i++) {
@@ -202,14 +214,16 @@ namespace CGA_FIRST.modules
         public unsafe void FillTriangle(List<List<int>> face, BitmapData bData, int bitsPerPixel, Bitmap bmp, byte* scan0)
         {
             //world
-            Vector3 aw = MatrixSolver.createFromVector4(verteces_world[face[0][0] - 1]);
-            Vector3 bw = MatrixSolver.createFromVector4(verteces_world[face[1][0] - 1]);
-            Vector3 cw = MatrixSolver.createFromVector4(verteces_world[face[2][0] - 1]);
+            Vector4 aw = (verteces_world[face[0][0] - 1]);
+            Vector4 bw = (verteces_world[face[1][0] - 1]);
+            Vector4 cw = (verteces_world[face[2][0] - 1]);
+            //aw *= aw.W; bw *= bw.W; cw *= cw.W;
 
             //screen
             Vector4 a = verteces_changeable[face[0][0] - 1];
             Vector4 b = verteces_changeable[face[1][0] - 1];
             Vector4 c = verteces_changeable[face[2][0] - 1];
+            //a *= a.W; b *= b.W; c *= c.W;
 
             Vector3 vertexNormalA = Vector3.Normalize(normals_changeable[face[0][2] - 1]);
             Vector3 vertexNormalB = Vector3.Normalize(normals_changeable[face[1][2] - 1]);
@@ -219,6 +233,10 @@ namespace CGA_FIRST.modules
             Vector2 textureA = ObjParser.textures[face[0][1] - 1];/*/ screenTriangle[0].Z;*/
             Vector2 textureB = ObjParser.textures[face[1][1] - 1];/*/ screenTriangle[1].Z;*/
             Vector2 textureC = ObjParser.textures[face[2][1] - 1];/*/ screenTriangle[2].Z;*/
+            textureA *= a.W; textureB *= b.W; textureC *= c.W;
+            //textureA *= aw.W; textureB *= bw.W; textureC *= cw.W;
+            //делим всё вначале на W
+
 
             if (a.Y > c.Y) {
                 (a, c) = (c, a);
@@ -243,20 +261,26 @@ namespace CGA_FIRST.modules
                 (bw, cw) = (cw, bw);
             }
 
+
+
             Vector4 k1 = (c - a) / (c.Y - a.Y);
             Vector3 vertexNormalKoeff1 = (vertexNormalC - vertexNormalA) / (c.Y - a.Y);
-            Vector3 worldKoeff1 = (cw - aw) / (c.Y - a.Y);
+            Vector4 worldKoeff1 = (cw - aw) / (c.Y - a.Y);
             Vector2 textureKoeff1 = (textureC - textureA) / (c.Y - a.Y);
 
             Vector4 k2 = (b - a) / (b.Y - a.Y);
             Vector3 vertexNormalKoeff2 = (vertexNormalB - vertexNormalA) / (b.Y - a.Y);
-            Vector3 worldKoeff2 = (bw - aw) / (b.Y - a.Y);
+            Vector4 worldKoeff2 = (bw - aw) / (b.Y - a.Y);
             Vector2 textureKoeff2 = (textureB - textureA) / (b.Y - a.Y);
 
             Vector4 k3 = (c - b) / (c.Y - b.Y);
             Vector3 vertexNormalKoeff3 = (vertexNormalC - vertexNormalB) / (c.Y - b.Y);
-            Vector3 worldKoeff3 = (cw - bw) / (c.Y - b.Y);
+            Vector4 worldKoeff3 = (cw - bw) / (c.Y - b.Y);
             Vector2 textureKoeff3 = (textureC - textureB) / (c.Y - b.Y);
+
+            //добавить по коэффу (3 штуки) как на доске после к1 (не надо)
+            //надо в w записать обратное
+            //
 
             int top = Math.Max(0, (int)Math.Ceiling(a.Y));
             int bottom = Math.Min(window_height, (int)Math.Ceiling(c.Y));
@@ -265,8 +289,8 @@ namespace CGA_FIRST.modules
                 Vector4 l = a + (y - a.Y) * k1;
                 Vector4 r = (y < b.Y) ? a + (y - a.Y) * k2 : b + (y - b.Y) * k3;
 
-                Vector3 worldL = aw + (y - a.Y) * worldKoeff1;
-                Vector3 worldR = y < b.Y ? aw + (y - a.Y) * worldKoeff2 :
+                Vector4 worldL = aw + (y - a.Y) * worldKoeff1;
+                Vector4 worldR = y < b.Y ? aw + (y - a.Y) * worldKoeff2 :
                                            bw + (y - b.Y) * worldKoeff3;
 
 
@@ -288,16 +312,42 @@ namespace CGA_FIRST.modules
 
                 Vector4 k = (r - l) / (r.X - l.X);
                 Vector3 normalKoeff = (normalR - normalL) / (r.X - l.X);
-                Vector3 worldKoeff = (worldR - worldL) / (r.X - l.X);
+                Vector4 worldKoeff = (worldR - worldL) / (r.X - l.X);
                 Vector2 textureKoeff = (textureR - textureL) / (r.X - l.X);
 
                 int left = Math.Max(0, (int) Math.Ceiling(l.X));
                 int right = Math.Min(window_width, (int)Math.Ceiling(r.X));
 
+                //надо что-то делить на w (всё)
+                //
+                //
+                //
+                //
+                //
 
+                Vector4 pz0 = l + (left - l.X) * k;
+                float z0 = pz0.W;
+                Vector2 uv0 = new Vector2(left, top);
                 for (int x = left; x < right; x++) {
                     Vector4 p = l + (x - l.X) * k;
-                    Vector3 pWorld = worldL + (x - l.X) * worldKoeff;
+                    Vector4 pWorld = worldL + (x - l.X) * worldKoeff;
+
+                    float t;
+                    if (x == left || y == top)
+                    {
+                        t = 0;
+                    }
+                    else
+                    {
+                        t = (x - left) / (y - top);
+                    }
+
+                    float z1 = p.W;
+                    /*Vector2 uv1 = new Vector2(x, y);
+
+                    Vector2 uv2 = ((1 - t) * uv0 / z0 + t * uv1 / z1)
+                                   / ((1 - t) * 1 / z0 + t * 1 / z1);
+                    */
 
                     int index = (int)y * window_width + (int)x;
                     if (p.Z < zBuffer[index])
@@ -305,8 +355,9 @@ namespace CGA_FIRST.modules
                         Vector3 normal = normalL + (x - l.X) * normalKoeff;
                         normal = Vector3.Normalize(normal);
 
-                        Vector2 texture = textureL + (x - l.X) * textureKoeff;
-
+                        Vector2 texture = (textureL + (x - l.X) * textureKoeff) / p.W;
+                        //Vector2 texture = (textureL + (x - l.X) * textureKoeff) / pWorld.W;
+                        //здесь потом поделить на w
                         // Цвет объекта.
                         Vector3 color = new Vector3(235, 163, 9);
                         if (ObjParser.diffuseMap != null)
@@ -314,6 +365,9 @@ namespace CGA_FIRST.modules
                             System.Drawing.Color objColor = ObjParser.diffuseMap.GetPixel(
                                 Convert.ToInt32(texture.X * (ObjParser.diffuseMap.Width - 1)), 
                                 Convert.ToInt32((1 - texture.Y) * (ObjParser.diffuseMap.Height - 1)));
+                            /*System.Drawing.Color objColor = ObjParser.diffuseMap.GetPixel(
+                                Convert.ToInt32(textureNew.X * (ObjParser.diffuseMap.Width - 1)),
+                                Convert.ToInt32((1 - textureNew.Y) * (ObjParser.diffuseMap.Height - 1)));*/
                             color = new Vector3(objColor.R, objColor.G, objColor.B);
                         }
 
@@ -338,7 +392,8 @@ namespace CGA_FIRST.modules
 
                         float[] diffuseValues = DiffuseLightning(color, normal, -lightDirection);
 
-                        float[] specularValues = SpecularLightning(specular, Vector3.Normalize(eye - pWorld), -lightDirection, normal);
+                        float[] specularValues = SpecularLightning(specular, 
+                            Vector3.Normalize(eye - MatrixSolver.createFromVector4(pWorld)), -lightDirection, normal);
 
                         zBuffer[index] = p.Z;
                         byte* data = scan0 + (int)y * bData.Stride + (int)x * bitsPerPixel / 8;
