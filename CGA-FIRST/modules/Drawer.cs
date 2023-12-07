@@ -28,10 +28,11 @@ namespace CGA_FIRST.modules
         private Vector3 target = new Vector3(0, 0, 0);
 
         private Vector3 lightDirection = new Vector3(-1, -1, -1);
+        //private Vector3 lightDirection = new Vector3(0, 0, -1);
         //public static Vector3 light = new Vector3(0f, 0f, 1f);
         private float lightIntensity = 1f;
         //private float ambientLightIntensity = 1 / 5f;
-        private float ambientLightIntensity = 0.05f;
+        private float ambientLightIntensity = 0.1f;
         //private float diffuseLightIntensity = 2f;
         private float diffuseLightIntensity = 1f;
         //private float specularFactor = 10f;
@@ -77,8 +78,8 @@ namespace CGA_FIRST.modules
             this.normals = normals;
             float aspect = (float)window_width / window_height;
             viewToProjectionMatrix = new Matrix4x4(
-                    (float)(1 / (aspect * Math.Tan(Math.PI/8))), 0, 0, 0,
-                    0, (float)(1 / Math.Tan(Math.PI / 8)), 0, 0,
+                    (float)(1 / (aspect * Math.Tan(Math.PI / 4))), 0, 0, 0,
+                    0, (float)(1 / Math.Tan(Math.PI / 4)), 0, 0,
                     0, 0, (float)(zFar / (zNear - zFar)), (float)(zNear * zFar / (zNear - zFar)),
                     0, 0, -1, 0
                 );
@@ -356,7 +357,7 @@ namespace CGA_FIRST.modules
                         normal = Vector3.Normalize(normal);
 
                         Vector2 texture = (textureL + (x - l.X) * textureKoeff) / p.W;
-                        //Vector2 texture = (textureL + (x - l.X) * textureKoeff) / pWorld.W;
+                        //Vector2 texture = (textureL + (x - l.X) * textureKoeff);
                         //здесь потом поделить на w
                         // Цвет объекта.
                         Vector3 color = new Vector3(235, 163, 9);
@@ -372,7 +373,7 @@ namespace CGA_FIRST.modules
                         }
 
                         // Цвет отражения.
-                        Vector3 specular = new Vector3(212, 21, 21);
+                        Vector3 specular = new Vector3(255, 255, 255);
                         if (ObjParser.mirrorMap != null)
                         {
                             System.Drawing.Color spcColor = ObjParser.mirrorMap.GetPixel(
@@ -382,12 +383,13 @@ namespace CGA_FIRST.modules
                         }
 
                         // Нормаль
-                        /*System.Drawing.Color normalColor = ObjParser.normalMap.GetPixel(
+                        System.Drawing.Color normalColor = ObjParser.normalMap.GetPixel(
                                 Convert.ToInt32(texture.X * (ObjParser.normalMap.Width - 1)),
                                 Convert.ToInt32((1 - texture.Y) * (ObjParser.normalMap.Height - 1)));
-                        normal = new Vector3(normalColor.R, normalColor.G, normalColor.B);
-                        normal = Vector3.Normalize(normal * 2 - Vector3.One);*/
-
+                        normal = new Vector3(normalColor.R, normalColor.G, normalColor.B) / 255;
+                        
+                        normal = Vector3.Normalize(normal * 2 - Vector3.One);
+                        
                         float[] ambientValues = AmbientLightning(color);
 
                         float[] diffuseValues = DiffuseLightning(color, normal, -lightDirection);
@@ -401,10 +403,14 @@ namespace CGA_FIRST.modules
                         byte B = (byte)(Math.Min(lineColour.B * (ambientValues[2]), 255));
                         byte G = (byte)(lineColour.G * (ambientValues[1]));
                         byte R = (byte)(lineColour.R * (ambientValues[0]));
-
-                        data[0] = (byte) Math.Min((ambientValues[2] + diffuseValues[2] + specularValues[2]), 255);
-                        data[1] = (byte) Math.Min((ambientValues[1] + diffuseValues[1] + specularValues[1]), 255);
-                        data[2] = (byte) Math.Min((ambientValues[0] + diffuseValues[0] + specularValues[0]), 255);
+                        /*
+                        data[0] = (byte) Math.Min((diffuseValues[2]), 255);
+                        data[1] = (byte) Math.Min((diffuseValues[1]), 255);
+                        data[2] = (byte) Math.Min((diffuseValues[0]), 255);
+                        */
+                        data[0] = (byte)Math.Min((ambientValues[2] + diffuseValues[2] + specularValues[2]), 255);
+                        data[1] = (byte)Math.Min((ambientValues[1] + diffuseValues[1] + specularValues[1]), 255);
+                        data[2] = (byte)Math.Min((ambientValues[0] + diffuseValues[0] + specularValues[0]), 255);
 
                     }
                 }
@@ -445,9 +451,15 @@ namespace CGA_FIRST.modules
 
         private bool IsBackFace(List<List<int>> face)
         {
-            Vector3 viewVector = ToVector3(verteces_view[face[0][0] - 1]) - eye;
+            //Vector3 viewVector = ToVector3(verteces_changeable[face[0][0] - 1]) - eye;
+            Vector3 v1 = (ToVector3(verteces_changeable[face[1][0] - 1]) - ToVector3(verteces_changeable[face[0][0] - 1]));
+            Vector3 v2 = (ToVector3(verteces_changeable[face[2][0] - 1]) - ToVector3(verteces_changeable[face[0][0] - 1]));
 
-            return Vector3.Dot(CalculateNormal(face), viewVector) <= 0;
+            //посчитали z резултирующего вектора (векторного произведения в1 и в2б а х и у там нули)
+            return v2.X * v1.Y - v2.Y * v1.X <= 0;
+
+            //return Vector3.Dot(CalculateNormal(face), viewVector) <= 0;
+            //return false;
         }
         
         private Vector3 ToVector3(Vector4 vector)
