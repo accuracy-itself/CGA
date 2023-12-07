@@ -133,10 +133,10 @@ namespace CGA_FIRST.modules
                 verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(scaleMatrix);
                 verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(scaleMatrix);
 
-                verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(translationMatrix);
                 verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixX);
                 verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixY);
                 verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(MatrixRotater.rotationMatrixZ);
+                verteces_changeable[i] = verteces_changeable[i].ApplyMatrix(translationMatrix);
                 float W = 1 / verteces_changeable[i].W;
                 verteces_world.Add(verteces_changeable[i]);
                 verteces_world[i] = new Vector4(verteces_changeable[i].X,
@@ -389,7 +389,11 @@ namespace CGA_FIRST.modules
                         normal = new Vector3(normalColor.R, normalColor.G, normalColor.B) / 255;
                         
                         normal = Vector3.Normalize(normal * 2 - Vector3.One);
-                        
+
+                        normal = normal.ApplyMatrix(MatrixRotater.rotationMatrixX);
+                        normal = normal.ApplyMatrix(MatrixRotater.rotationMatrixY);
+                        normal = normal.ApplyMatrix(MatrixRotater.rotationMatrixZ);
+
                         float[] ambientValues = AmbientLightning(color);
 
                         float[] diffuseValues = DiffuseLightning(color, normal, -lightDirection);
